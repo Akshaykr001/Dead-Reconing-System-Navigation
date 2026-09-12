@@ -69,7 +69,8 @@ def _load_vehicle(path: Path, phone_start: pd.Timestamp) -> pd.DataFrame:
     elapsed_values = pd.to_numeric(raw[elapsed], errors="coerce")
     result = pd.DataFrame({
         "timestamp": phone_start + pd.to_timedelta(elapsed_values - elapsed_values.min(), unit="s"),
-        "vehicle_speed": pd.to_numeric(raw[speed], errors="coerce"),
+        # Raw IO-VNBD vehicle speed is in km/h; convert it to meters/second.
+        "vehicle_speed": pd.to_numeric(raw[speed], errors="coerce") / 3.6,
     })
     result["timestamp"] = result["timestamp"].astype("datetime64[ns]")
     return result.dropna().sort_values("timestamp").drop_duplicates("timestamp")

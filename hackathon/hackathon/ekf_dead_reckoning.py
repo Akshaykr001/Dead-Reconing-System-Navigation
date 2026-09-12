@@ -236,11 +236,13 @@ def run_ekf(
             covariance, state, speed, dt, gyro_noise_std, speed_noise_std, bias_walk_std
         )
 
-        # Magnetometer is always a heading correction, including during outage.
-        mag_heading = np.deg2rad(float(row["mag_heading"]))
-        mag_matrix = np.zeros((1, 5))
-        mag_matrix[0, 2] = 1.0
-        state, covariance = update(state, covariance, np.array([mag_heading]), mag_matrix, mag_noise, 0)
+        # Use magnetometer heading only with GNSS available; disturbed magnetic
+        # readings during outage otherwise make the dead-reckoned path oscillate.
+        if bool(row["gnss_available"]):
+            mag_heading = np.deg2rad(float(row["mag_heading"]))
+            mag_matrix = np.zeros((1, 5))
+            mag_matrix[0, 2] = 1.0
+            state, covariance = update(state, covariance, np.array([mag_heading]), mag_matrix, mag_noise, 0)
 
         # GPS is a position correction only when the availability flag is true.
         if bool(row["gnss_available"]):

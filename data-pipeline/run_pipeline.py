@@ -45,10 +45,8 @@ def main() -> None:
     )
 
     ekf_segment = pd.read_csv(SEGMENT_PATH)
-    ekf_segment["vehicle_speed"] = pd.to_numeric(ekf_segment["vehicle_speed"], errors="raise") / 3.6
     ekf_segment.to_csv(EKF_SEGMENT_PATH, index=False)
     ekf_input = pd.read_csv(OUTAGE_PATH)
-    ekf_input["vehicle_speed"] = pd.to_numeric(ekf_input["vehicle_speed"], errors="raise") / 3.6
     ekf_input.to_csv(EKF_INPUT_PATH, index=False)
 
     sys.path.insert(0, str(BACKEND_DIR))

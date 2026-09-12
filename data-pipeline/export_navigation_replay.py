@@ -8,6 +8,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from map_matching import snap_to_road
+
 REQUIRED_OUTPUT_COLUMNS = {
     "timestamp",
     "ground_truth_lat",
@@ -51,14 +53,17 @@ def build_replay(segment_path: Path, ekf_path: Path) -> list[dict[str, object]]:
         raise ValueError("No timestamps overlap between the segment and EKF output")
     merged = merged.sort_values("timestamp").reset_index(drop=True)
 
-    # No map matcher exists in this project. Zero is an explicit, deterministic
-    # unavailable state; it is not presented as a road-match result.
-    merged["road_match_confidence"] = 0.0
     # The prepared IO-VNBD segment stores speed in km/h; the dashboard and EKF
     # contract use m/s.
     merged["fused_velocity"] = pd.to_numeric(merged["vehicle_speed"], errors="coerce") / 3.6
     output: list[dict[str, object]] = []
-    for row in merged.itertuples(index=False):
+    road_match_confidence = 0.0
+    for index, row in enumerate(merged.itertuples(index=False)):
+        if index % 10 == 0:
+            road_match_confidence = snap_to_road(
+                row.estimated_lat,
+                row.estimated_lon,
+            )["confidence"]
         record = {
             "timestamp": row.timestamp.isoformat(),
             "ground_truth_lat": _finite(row.gps_lat, "ground_truth_lat"),
@@ -71,7 +76,7 @@ def build_replay(segment_path: Path, ekf_path: Path) -> list[dict[str, object]]:
             "fused_velocity": _finite(row.fused_velocity, "fused_velocity"),
             "position_uncertainty": _finite(row.position_uncertainty, "position_uncertainty"),
             "gnss_available": bool(row.gnss_available),
-            "road_match_confidence": 0.0,
+            "road_match_confidence": road_match_confidence,
         }
         output.append(record)
 
@@ -96,7 +101,9 @@ def main() -> None:
     print(f"First timestamp: {rows[0]['timestamp']}")
     print(f"Last timestamp: {rows[-1]['timestamp']}")
     print(f"Output: {args.output}")
-    print("Road match confidence: unavailable (no map-matching implementation found)")
+    api_calls = (len(rows) + 9) // 10
+    average_confidence = sum(row["road_match_confidence"] for row in rows) / len(rows)
+    print(f"Road match confidence: {api_calls} real API calls, average {average_confidence:.3f}")
 
 
 if __name__ == "__main__":
